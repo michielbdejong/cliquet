@@ -103,7 +103,7 @@ class PostgreSQL(PostgreSQLClient, StorageBase):
 
     """
 
-    schema_version = 1
+    schema_version = 2
 
     def __init__(self, *args, **kwargs):
         self._max_fetch_size = kwargs.pop('max_fetch_size')
