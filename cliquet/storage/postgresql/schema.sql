@@ -73,21 +73,13 @@ CREATE INDEX idx_deleted_last_modified_epoch ON deleted(as_epoch(last_modified))
 CREATE OR REPLACE FUNCTION resource_timestamp(uid VARCHAR, resource VARCHAR)
 RETURNS TIMESTAMP AS $$
 DECLARE
-    ts_records TIMESTAMP;
-    ts_deleted TIMESTAMP;
+    ts TIMESTAMP;
 BEGIN
-    SELECT MAX(last_modified) INTO ts_records
-      FROM records
-     WHERE user_id = uid
-       AND resource_name = resource;
+    SELECT last_modified INTO ts
+      FROM view_collection_timestamp
+     WHERE user_id = uid AND resource_name = resource;
 
-    SELECT MAX(last_modified) INTO ts_deleted
-      FROM deleted
-     WHERE user_id = uid
-       AND resource_name = resource;
-
-    -- Latest of records/deleted or current if empty
-    RETURN coalesce(greatest(ts_deleted, ts_records), localtimestamp);
+    RETURN coalesce(ts, localtimestamp);
 END;
 $$ LANGUAGE plpgsql;
 
@@ -124,7 +116,52 @@ CREATE TRIGGER tgr_deleted_last_modified
 BEFORE INSERT OR UPDATE ON deleted
 FOR EACH ROW EXECUTE PROCEDURE bump_timestamp();
 
+--
+-- Use a materialized view to cache collection timestamps.
+--
+DROP MATERIALIZED VIEW IF EXISTS view_collection_timestamp CASCADE;
+CREATE MATERIALIZED VIEW view_collection_timestamp AS (
+    WITH ts_records AS (
+        SELECT user_id, resource_name, MAX(last_modified) AS last_modified
+          FROM records
+          GROUP BY user_id, resource_name
+    ),
+    ts_deleted AS (
+        SELECT user_id, resource_name, MAX(last_modified) AS last_modified
+          FROM records
+          GROUP BY user_id, resource_name
+    ),
+    ts_records_delete AS (
+        SELECT r.user_id, r.resource_name,
+               greatest(r.last_modified, d.last_modified) AS last_modified
+          FROM ts_records AS r JOIN ts_deleted AS d
+            ON (r.user_id = d.user_id AND r.resource_name = d.resource_name)
+    )
+    SELECT user_id, resource_name, last_modified
+      FROM ts_records_delete
+);
+CREATE UNIQUE INDEX idx_view_collection_timestamp ON view_collection_timestamp (user_id, resource_name);
+
+DROP TRIGGER IF EXISTS tgr_records_refresh_collection_timestamp ON records;
+DROP TRIGGER IF EXISTS tgr_deleted_refresh_collection_timestamp ON deleted;
+
+CREATE OR REPLACE FUNCTION refresh_collection_timestamp()
+RETURNS trigger AS $$
+BEGIN
+    REFRESH MATERIALIZED VIEW view_collection_timestamp;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER tgr_records_refresh_collection_timestamp
+AFTER INSERT OR UPDATE ON records
+FOR EACH ROW EXECUTE PROCEDURE refresh_collection_timestamp();
+
+CREATE TRIGGER tgr_deleted_refresh_collection_timestamp
+AFTER INSERT OR UPDATE ON deleted
+FOR EACH ROW EXECUTE PROCEDURE refresh_collection_timestamp();
+
 
 -- Set storage schema version.
 -- Should match ``cliquet.storage.postgresql.PostgreSQL.schema_version``
-INSERT INTO metadata (name, value) VALUES ('storage_schema_version', '2');
+INSERT INTO metadata (name, value) VALUES ('storage_schema_version', '3');

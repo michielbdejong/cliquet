@@ -914,22 +914,21 @@ class PostgresqlStorageMigrationTest(unittest.TestCase):
         mocked.assert_any_call('migration_4_5.sql')
         mocked.assert_any_call('migration_5_6.sql')
 
-    def test_migration_1_2(self):
+    def test_running_every_migrations(self):
         version = self._get_installed_version()
         self.assertNotEqual(version, 1)
 
         with self.db.connect() as cursor:
             q = """
-            DELETE FROM metadata WHERE name = 'storage_schema_version';
-
-            DROP INDEX IF EXISTS idx_records_last_modified_epoch;
+            UPDATE metadata SET value = '1'
+            WHERE name = 'storage_schema_version';
             """
             cursor.execute(q)
 
         postgresql.load_from_config(self.config)
 
         version = self._get_installed_version()
-        self.assertNotEqual(version, 1)
+        self.assertEqual(version, self.version)
 
 
 class CloudStorageTest(StorageTest, unittest.TestCase):
