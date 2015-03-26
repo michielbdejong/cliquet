@@ -1,13 +1,12 @@
 from functools import wraps
 
-import requests
 import six
 from requests.exceptions import RequestException
 
 from cliquet import logger
 from cliquet.storage import StorageBase, exceptions, Filter
 from cliquet.storage.memory import apply_sorting, get_unicity_rules
-from cliquet.utils import json, COMPARISON
+from cliquet.utils import json, COMPARISON, requests
 
 
 API_PREFIX = "/v0"

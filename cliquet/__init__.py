@@ -3,9 +3,9 @@
 import datetime
 import warnings
 
+import requests
 from dateutil import parser as dateparser
 import pkg_resources
-import requests
 import structlog
 import webob
 try:
@@ -71,6 +71,7 @@ DEFAULT_SETTINGS = {
     'cliquet.sentry_url': None,
     'cliquet.sentry_projects': '',
     'cliquet.statsd_url': None,
+    'cliquet.gevent_enabled': False,
 }
 
 
@@ -82,6 +83,18 @@ def monkey_patch_json(config):
     # Override json renderer using ujson
     renderer = JSONRenderer(serializer=lambda v, **kw: utils.json.dumps(v))
     config.add_renderer('json', renderer)
+
+
+def patch_gevent(config):
+    if asbool(config['cliquet.gevent_enabled']):
+        import gevent
+        import gevent.monkey
+        gevent.monkey.patch_socket()
+
+        import psycogreen.gevent
+        psycogreen.gevent.patch_psycopg()
+
+        import grequests  # NoQA: Make sure that we have it at startup
 
 
 def load_default_settings(config):
@@ -270,6 +283,8 @@ def initialize_cliquet(config, version=None, project_name=None):
     :type project_name: string
     """
     settings = config.registry.settings
+
+    patch_gevent(settings)
 
     # The API version is derivated from the module version.
     project_version = settings.get('cliquet.project_version') or version

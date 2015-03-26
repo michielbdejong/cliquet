@@ -9,6 +9,11 @@ import ujson as json
 from cornice import cors
 from colander import null
 
+try:
+    import grequests as requests  # NoQa
+except ImportError:
+    import requests  # NoQa
+
 
 def strip_whitespace(v):
     """Remove whitespace, newlines, and tabs from the beginning/end

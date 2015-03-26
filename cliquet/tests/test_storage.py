@@ -3,7 +3,6 @@ import time
 import mock
 import psycopg2
 import redis
-import requests
 import six
 
 from cliquet import utils
@@ -13,6 +12,7 @@ from cliquet.storage import (
     redis as redisbackend, postgresql, cloud_storage,
     Sort, StorageBase
 )
+from cliquet.utils import requests
 
 from .support import unittest, ThreadMixin, DummyRequest
 
