@@ -93,7 +93,7 @@ class BatchViewTest(BaseWebTest, unittest.TestCase):
 
     def test_preconditions_headers_of_batch_are_ignored(self):
         resp = self.app.get('/mushrooms', headers=self.headers)
-        before = resp.headers['Last-Modified']
+        before = resp.headers['Last-Modified'].decode('utf8')
 
         request = {'path': '/mushrooms',
                    'method': 'POST',
@@ -109,7 +109,7 @@ class BatchViewTest(BaseWebTest, unittest.TestCase):
 
     def test_preconditions_headers_within_batch_are_respected(self):
         resp = self.app.get('/mushrooms', headers=self.headers)
-        before = resp.headers['Last-Modified']
+        before = resp.headers['Last-Modified'].decode('utf8')
 
         request = {'path': '/mushrooms',
                    'method': 'POST',
