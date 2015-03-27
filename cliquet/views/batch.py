@@ -142,6 +142,8 @@ def build_request(original, dict_obj):
 
     method = dict_obj.get('method') or 'GET'
     headers = dict(original.headers)
+    headers.pop('If-Modified-Since', None)
+    headers.pop('If-Unmodified-Since', None)
     headers.update(**dict_obj.get('headers') or {})
     payload = dict_obj.get('body') or ''
 

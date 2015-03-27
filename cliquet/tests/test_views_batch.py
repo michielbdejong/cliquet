@@ -91,6 +91,22 @@ class BatchViewTest(BaseWebTest, unittest.TestCase):
         self.assertEqual(hello['body']['hello'], 'cliquet')
         self.assertIn('application/json', hello['headers']['Content-Type'])
 
+    def test_preconditions_headers_are_ignored(self):
+        resp = self.app.get('/mushrooms', headers=self.headers)
+        before = resp.headers['Last-Modified']
+
+        request = {'path': '/mushrooms',
+                   'method': 'POST',
+                   'body': {'name': 'Champignon'}}
+        body = {'requests': [request, request]}
+
+        headers = self.headers.copy()
+        headers['If-Unmodified-Since'] = before
+        resp = self.app.post_json('/batch', body, headers=headers)
+        responses = resp.json['responses']
+        self.assertEqual(responses[0]['status'], 201)
+        self.assertEqual(responses[1]['status'], 201)
+
 
 class BatchSchemaTest(unittest.TestCase):
     def setUp(self):
