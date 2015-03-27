@@ -22,10 +22,12 @@ class PostgreSQLClient(object):
     def __init__(self, *args, **kwargs):
         minconn = kwargs.pop('min_connections', 1)
         maxconn = kwargs.pop('max_connections')
+        pool_class = (kwargs.pop('pool_class', None) or
+                      psycopg2.pool.ThreadedConnectionPool)
         self._conn_kwargs = kwargs
-        self.pool = psycopg2.pool.ThreadedConnectionPool(minconn=minconn,
-                                                         maxconn=maxconn,
-                                                         **self._conn_kwargs)
+        self.pool = pool_class(minconn=minconn,
+                               maxconn=maxconn,
+                               **self._conn_kwargs)
 
     @contextlib.contextmanager
     def connect(self):
@@ -604,10 +606,14 @@ def load_from_config(config):
     settings = config.get_settings()
 
     max_fetch_size = settings['cliquet.storage_max_fetch_size']
+
     pool_maxconn = int(settings['cliquet.storage_pool_maxconn'])
+    pool_class = config.maybe_dotted(settings['cliquet.storage_pool_class'])
+
     uri = settings['cliquet.storage_url']
     uri = urlparse.urlparse(uri)
-    conn_kwargs = dict(max_connections=pool_maxconn,
+    conn_kwargs = dict(pool_class=pool_class,
+                       max_connections=pool_maxconn,
                        host=uri.hostname,
                        port=uri.port,
                        user=uri.username,

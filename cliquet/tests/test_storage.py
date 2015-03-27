@@ -5,6 +5,7 @@ import psycopg2
 import redis
 import requests
 import six
+from pyramid.config import Configurator
 
 from cliquet import utils
 from cliquet import schema
@@ -72,7 +73,7 @@ class BaseTestStorage(object):
         """
         if settings is None:
             settings = self.settings
-        return mock.Mock(get_settings=mock.Mock(return_value=settings))
+        return Configurator(settings=settings)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -741,6 +742,7 @@ class RedisStorageTest(MemoryStorageTest, unittest.TestCase):
     backend = redisbackend
     settings = {
         'cliquet.storage_pool_maxconn': 50,
+        'cliquet.storage_pool_class': None,
         'cliquet.storage_url': ''
     }
 
@@ -780,6 +782,7 @@ class PostgresqlStorageTest(StorageTest, unittest.TestCase):
     backend = postgresql
     settings = {
         'cliquet.storage_pool_maxconn': 50,
+        'cliquet.storage_pool_class': None,
         'cliquet.storage_max_fetch_size': 10000,
         'cliquet.storage_url':
             'postgres://postgres:postgres@localhost:5432/testdb'

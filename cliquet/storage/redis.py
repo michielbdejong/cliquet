@@ -43,8 +43,11 @@ class Redis(MemoryBasedStorage):
     def __init__(self, *args, **kwargs):
         super(Redis, self).__init__(*args, **kwargs)
         kwargs.pop('id_generator', None)
+
         maxconn = kwargs.pop('max_connections')
-        connection_pool = redis.BlockingConnectionPool(max_connections=maxconn)
+        pool_class = (kwargs.pop('pool_class', None) or
+                      redis.BlockingConnectionPool)
+        connection_pool = pool_class(max_connections=maxconn)
         self._client = redis.StrictRedis(connection_pool=connection_pool,
                                          **kwargs)
 
@@ -237,8 +240,10 @@ def load_from_config(config):
     uri = settings['cliquet.storage_url']
     uri = urlparse.urlparse(uri)
     pool_maxconn = int(settings['cliquet.storage_pool_maxconn'])
+    pool_class = config.maybe_dotted(settings['cliquet.storage_pool_class'])
 
-    return Redis(max_connections=pool_maxconn,
+    return Redis(pool_class=pool_class,
+                 max_connections=pool_maxconn,
                  host=uri.hostname or 'localhost',
                  port=uri.port or 6739,
                  password=uri.password or None,

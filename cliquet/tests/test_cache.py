@@ -3,6 +3,7 @@ import time
 
 import psycopg2
 import redis
+from pyramid.config import Configurator
 
 from cliquet.storage import exceptions
 from cliquet.cache import (CacheBase, postgresql as postgresql_backend,
@@ -43,7 +44,7 @@ class BaseTestCache(object):
         """
         if settings is None:
             settings = self.settings
-        return mock.Mock(get_settings=mock.Mock(return_value=settings))
+        return Configurator(settings=settings)
 
     def tearDown(self):
         mock.patch.stopall()
@@ -107,7 +108,8 @@ class RedisCacheTest(BaseTestCache, unittest.TestCase):
     backend = redis_backend
     settings = {
         'cliquet.cache_url': '',
-        'cliquet.cache_pool_maxconn': 50
+        'cliquet.cache_pool_maxconn': 50,
+        'cliquet.cache_pool_class': None,
     }
 
     def __init__(self, *args, **kwargs):
@@ -122,6 +124,7 @@ class PostgreSQLCacheTest(BaseTestCache, unittest.TestCase):
     backend = postgresql_backend
     settings = {
         'cliquet.cache_pool_maxconn': 50,
+        'cliquet.cache_pool_class': None,
         'cliquet.cache_url':
             'postgres://postgres:postgres@localhost:5432/testdb'
     }

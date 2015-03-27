@@ -125,8 +125,10 @@ def load_from_config(config):
     uri = settings['cliquet.cache_url']
     uri = urlparse.urlparse(uri)
     pool_maxconn = int(settings['cliquet.cache_pool_maxconn'])
+    pool_class = config.maybe_dotted(settings['cliquet.cache_pool_class'])
 
-    conn_kwargs = dict(max_connections=pool_maxconn,
+    conn_kwargs = dict(pool_class=pool_class,
+                       max_connections=pool_maxconn,
                        host=uri.hostname,
                        port=uri.port,
                        user=uri.username,
