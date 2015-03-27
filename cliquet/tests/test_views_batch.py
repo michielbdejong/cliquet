@@ -91,7 +91,7 @@ class BatchViewTest(BaseWebTest, unittest.TestCase):
         self.assertEqual(hello['body']['hello'], 'cliquet')
         self.assertIn('application/json', hello['headers']['Content-Type'])
 
-    def test_preconditions_headers_are_ignored(self):
+    def test_preconditions_headers_of_batch_are_ignored(self):
         resp = self.app.get('/mushrooms', headers=self.headers)
         before = resp.headers['Last-Modified']
 
@@ -106,6 +106,21 @@ class BatchViewTest(BaseWebTest, unittest.TestCase):
         responses = resp.json['responses']
         self.assertEqual(responses[0]['status'], 201)
         self.assertEqual(responses[1]['status'], 201)
+
+    def test_preconditions_headers_within_batch_are_respected(self):
+        resp = self.app.get('/mushrooms', headers=self.headers)
+        before = resp.headers['Last-Modified']
+
+        request = {'path': '/mushrooms',
+                   'method': 'POST',
+                   'body': {'name': 'Champignon'}}
+        body = {'requests': [request, request],
+                'defaults': {'headers': {'If-Unmodified-Since': before}}}
+
+        resp = self.app.post_json('/batch', body, headers=self.headers)
+        responses = resp.json['responses']
+        self.assertEqual(responses[0]['status'], 201)
+        self.assertEqual(responses[1]['status'], 412)
 
 
 class BatchSchemaTest(unittest.TestCase):
