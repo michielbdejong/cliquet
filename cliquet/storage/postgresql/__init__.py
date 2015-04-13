@@ -6,6 +6,7 @@ from collections import defaultdict
 import psycopg2
 import psycopg2.extras
 import psycopg2.pool
+from pyramid import events as pyramid_events
 import six
 from six.moves.urllib import parse as urlparse
 
@@ -134,6 +135,14 @@ class PostgreSQL(PostgreSQLClient, StorageBase):
             psycopg2.extras.register_json(cursor,
                                           globally=True,
                                           loads=json.loads)
+
+    @pyramid_events.subscriber(pyramid_events.ApplicationCreated)
+    def _on_application_startup(self, event):
+        version = self._get_installed_version()
+        error_msg = ('Database schema mismatch (expected: %s, found: %s). '
+                     'Run ``cliquet --ini FILE migrate``.')
+        assert version == self.schema_version,\
+               error_msg % (self.schema_version, version)
 
     def _execute_sql_file(self, filepath):
         here = os.path.abspath(os.path.dirname(__file__))
