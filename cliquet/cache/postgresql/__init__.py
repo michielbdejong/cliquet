@@ -2,8 +2,6 @@ from __future__ import absolute_import
 
 import os
 
-from six.moves.urllib import parse as urlparse
-
 from cliquet import logger
 from cliquet.cache import CacheBase
 from cliquet.storage.postgresql import PostgreSQLClient
@@ -48,8 +46,8 @@ class PostgreSQL(PostgreSQLClient, CacheBase):
     :noindex:
     """
 
-    def __init__(self, **kwargs):
-        super(PostgreSQL, self).__init__(**kwargs)
+    def __init__(self, *args, **kwargs):
+        super(PostgreSQL, self).__init__(*args, **kwargs)
 
     def initialize_schema(self):
         # Create schema
@@ -117,17 +115,19 @@ class PostgreSQL(PostgreSQLClient, CacheBase):
 
 def load_from_config(config):
     settings = config.get_settings()
-    uri = settings['cliquet.cache_url']
-    uri = urlparse.urlparse(uri)
+
+    dburi = settings['cliquet.cache_url']
+    poolclass = config.maybe_dotted(settings['cliquet.cache_pool_class'])
     pool_size = int(settings['cliquet.cache_pool_size'])
+    pool_max_overflow = int(settings['cliquet.cache_pool_max_overflow'])
+    pool_max_backlog = int(settings['cliquet.cache_pool_max_backlog'])
+    pool_recycle = int(settings['cliquet.cache_pool_recycle'])
+    pool_timeout = int(settings['cliquet.cache_pool_timeout'])
 
-    conn_kwargs = dict(pool_size=pool_size,
-                       host=uri.hostname,
-                       port=uri.port,
-                       user=uri.username,
-                       password=uri.password,
-                       database=uri.path[1:] if uri.path else '')
-    # Filter specified values only, to preserve PostgreSQL defaults
-    conn_kwargs = dict([(k, v) for k, v in conn_kwargs.items() if v])
-
-    return PostgreSQL(**conn_kwargs)
+    return PostgreSQL(dburi,
+                      poolclass=poolclass,
+                      pool_size=pool_size,
+                      max_overflow=pool_max_overflow,
+                      max_backlog=pool_max_backlog,
+                      pool_recycle=pool_recycle,
+                      pool_timeout=pool_timeout)

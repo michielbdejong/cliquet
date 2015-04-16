@@ -5,9 +5,8 @@ from collections import defaultdict
 
 import psycopg2
 import psycopg2.extras
-import psycopg2.pool
 import six
-from six.moves.urllib import parse as urlparse
+from sqlalchemy import create_engine
 
 from cliquet import logger
 from cliquet.storage import StorageBase, exceptions, Filter
@@ -681,16 +680,20 @@ def load_from_config(config):
     settings = config.get_settings()
 
     max_fetch_size = settings['cliquet.storage_max_fetch_size']
+
+    dburi = settings['cliquet.storage_url']
+    poolclass = config.maybe_dotted(settings['cliquet.storage_pool_class'])
     pool_size = int(settings['cliquet.storage_pool_size'])
-    uri = settings['cliquet.storage_url']
-    uri = urlparse.urlparse(uri)
-    conn_kwargs = dict(pool_size=pool_size,
-                       host=uri.hostname,
-                       port=uri.port,
-                       user=uri.username,
-                       password=uri.password,
-                       database=uri.path[1:] if uri.path else '')
-    # Filter specified values only, to preserve PostgreSQL defaults
-    conn_kwargs = dict([(k, v) for k, v in conn_kwargs.items() if v])
-    return PostgreSQL(max_fetch_size=int(max_fetch_size),
-                      **conn_kwargs)
+    pool_max_overflow = int(settings['cliquet.storage_pool_max_overflow'])
+    pool_max_backlog = int(settings['cliquet.storage_pool_max_backlog'])
+    pool_recycle = int(settings['cliquet.storage_pool_recycle'])
+    pool_timeout = int(settings['cliquet.storage_pool_timeout'])
+
+    return PostgreSQL(dburi,
+                      max_fetch_size=int(max_fetch_size),
+                      poolclass=poolclass,
+                      pool_size=pool_size,
+                      max_overflow=pool_max_overflow,
+                      max_backlog=pool_max_backlog,
+                      pool_recycle=pool_recycle,
+                      pool_timeout=pool_timeout)
