@@ -18,34 +18,8 @@ psycopg2.extensions.register_type(psycopg2.extensions.UNICODEARRAY)
 
 
 class PostgreSQLClient(object):
-
-    pool = None
-
-    def __init__(self, *args, **kwargs):
-        pool_size = kwargs.pop('pool_size')
-        self._conn_kwargs = kwargs
-        pool_klass = psycopg2.pool.ThreadedConnectionPool
-        if PostgreSQLClient.pool is None:
-            PostgreSQLClient.pool = pool_klass(minconn=pool_size,
-                                               maxconn=pool_size,
-                                               **self._conn_kwargs)
-        elif pool_size != self.pool.minconn:
-            msg = ("Pool size %s ignored for PostgreSQL backend "
-                   "(Already set to %s).") % (pool_size, self.pool.minconn)
-            warnings.warn(msg)
-
-        # When fsync setting is off, like on TravisCI or in during development,
-        # cliquet some storage tests fail because commits are not applied
-        # accross every opened connections.
-        # XXX: find a proper solution to support fsync off.
-        # Meanhwile, disable connection pooling to prevent test suite failures.
-        self._always_close = False
-        with self.connect(readonly=True) as cursor:
-            cursor.execute("SELECT current_setting('fsync');")
-            fsync = cursor.fetchone()[0]
-            if fsync == 'off':  # pragma: no cover
-                warnings.warn('Option fsync = off detected. Disable pooling.')
-                self._always_close = True
+    def __init__(self, dburl, **kwargs):
+        self._engine = create_engine(dburl, **kwargs)
 
     @contextlib.contextmanager
     def connect(self, readonly=False):
@@ -56,30 +30,30 @@ class PostgreSQLClient(object):
 
         If the database could not be be reached a 503 error is raised.
         """
-        conn = None
-        cursor = None
+        connection = None
+        trans = None
         try:
-            conn = self.pool.getconn()
-            conn.autocommit = readonly
+            connection = self._engine.connect()
+            if not readonly:
+                trans = connection.begin()
+            dbconn = connection.connection
             options = dict(cursor_factory=psycopg2.extras.DictCursor)
-            cursor = conn.cursor(**options)
+            cursor = dbconn.cursor(**options)
             # Start context
             yield cursor
             # End context
             if not readonly:
-                conn.commit()
-        except psycopg2.Error as e:
-            if cursor:
-                logger.debug(cursor.query)
+                trans.commit()
+        except Exception as e:
             logger.error(e)
-            if conn and not conn.closed:
-                conn.rollback()
+            if trans:
+                trans.rollback()
+            if connection:
+                connection.close()
             raise exceptions.BackendError(original=e)
         finally:
-            if cursor:
-                cursor.close()
-            if conn and not conn.closed:
-                self.pool.putconn(conn, close=self._always_close)
+            if connection:
+                connection.close()
 
 
 class PostgreSQL(PostgreSQLClient, StorageBase):
