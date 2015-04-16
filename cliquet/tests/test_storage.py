@@ -5,6 +5,7 @@ import psycopg2
 import redis
 import requests
 
+from cliquet import DEFAULT_SETTINGS
 from cliquet import utils
 from cliquet import schema
 from cliquet.storage import (
@@ -12,6 +13,8 @@ from cliquet.storage import (
     redis as redisbackend, postgresql, cloud_storage,
     Sort, StorageBase
 )
+
+from pyramid import testing
 
 from .support import unittest, ThreadMixin, DummyRequest, skip_if_travis
 
@@ -85,10 +88,12 @@ class TestResource(object):
 class BaseTestStorage(object):
     backend = None
 
-    settings = {}
+    extra_settings = {}
 
     def __init__(self, *args, **kwargs):
         super(BaseTestStorage, self).__init__(*args, **kwargs)
+        self.settings = DEFAULT_SETTINGS.copy()
+        self.settings.update(**self.extra_settings)
         self.storage = self.backend.load_from_config(self._get_config())
         self.storage.initialize_schema()
         self.resource = TestResource()
@@ -98,11 +103,11 @@ class BaseTestStorage(object):
         self.client_error_patcher = None
 
     def _get_config(self, settings=None):
-        """Mock Pyramid config object.
-        """
         if settings is None:
             settings = self.settings
-        return mock.Mock(get_settings=mock.Mock(return_value=settings))
+        config = testing.setUp()
+        config.add_settings(settings)
+        return config
 
     def tearDown(self):
         mock.patch.stopall()
@@ -793,10 +798,6 @@ class MemoryStorageTest(StorageTest, unittest.TestCase):
 
 class RedisStorageTest(MemoryStorageTest, unittest.TestCase):
     backend = redisbackend
-    settings = {
-        'cliquet.storage_pool_size': 50,
-        'cliquet.storage_url': ''
-    }
 
     def __init__(self, *args, **kwargs):
         super(RedisStorageTest, self).__init__(*args, **kwargs)
@@ -829,18 +830,16 @@ class RedisStorageTest(MemoryStorageTest, unittest.TestCase):
 
 class PostgresqlStorageTest(StorageTest, unittest.TestCase):
     backend = postgresql
-    settings = {
-        'cliquet.storage_pool_size': 10,
-        'cliquet.storage_max_fetch_size': 10000,
+    extra_settings = {
         'cliquet.storage_url':
-            'postgres://postgres:postgres@localhost:5432/testdb'
+            'postgresql://postgres:postgres@localhost:5432/testdb'
     }
 
     def __init__(self, *args, **kwargs):
         super(PostgresqlStorageTest, self).__init__(*args, **kwargs)
         self.client_error_patcher = mock.patch.object(
-            self.storage.pool,
-            'getconn',
+            self.storage._engine,
+            'connect',
             side_effect=psycopg2.DatabaseError)
 
     def test_number_of_fetched_records_can_be_limited_in_settings(self):
@@ -908,9 +907,8 @@ class PostgresqlStorageTest(StorageTest, unittest.TestCase):
 
 class CloudStorageTest(StorageTest, unittest.TestCase):
     backend = cloud_storage
-    settings = {
-        'cliquet.storage_url':
-            'http://localhost:8888'
+    extra_settings = {
+        'cliquet.storage_url': 'http://localhost:8888'
     }
 
     def setUp(self):

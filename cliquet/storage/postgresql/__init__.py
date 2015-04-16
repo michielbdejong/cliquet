@@ -7,6 +7,7 @@ import psycopg2
 import psycopg2.extras
 import six
 from sqlalchemy import create_engine
+from sqlalchemy import exc as sqla_errors
 
 from cliquet import logger
 from cliquet.storage import StorageBase, exceptions, Filter
@@ -44,7 +45,7 @@ class PostgreSQLClient(object):
             # End context
             if not readonly:
                 trans.commit()
-        except Exception as e:
+        except sqla_errors.DBAPIError as e:
             logger.error(e)
             if trans:
                 trans.rollback()

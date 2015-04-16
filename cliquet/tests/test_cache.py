@@ -3,7 +3,9 @@ import time
 
 import psycopg2
 import redis
+from pyramid import testing
 
+from cliquet import DEFAULT_SETTINGS
 from cliquet.storage import exceptions
 from cliquet.cache import (CacheBase, postgresql as postgresql_backend,
                            redis as redis_backend, memory as memory_backend)
@@ -31,10 +33,12 @@ class CacheBaseTest(unittest.TestCase):
 
 class BaseTestCache(object):
     backend = None
-    settings = {}
+    extra_settings = {}
 
     def __init__(self, *args, **kwargs):
         super(BaseTestCache, self).__init__(*args, **kwargs)
+        self.settings = DEFAULT_SETTINGS.copy()
+        self.settings.update(**self.extra_settings)
         self.cache = self.backend.load_from_config(self._get_config())
         self.cache.initialize_schema()
         self.client_error_patcher = None
@@ -44,7 +48,9 @@ class BaseTestCache(object):
         """
         if settings is None:
             settings = self.settings
-        return mock.Mock(get_settings=mock.Mock(return_value=settings))
+        config = testing.setUp()
+        config.add_settings(settings)
+        return config
 
     def tearDown(self):
         mock.patch.stopall()
@@ -130,10 +136,6 @@ class MemoryCacheTest(BaseTestCache, unittest.TestCase):
 
 class RedisCacheTest(BaseTestCache, unittest.TestCase):
     backend = redis_backend
-    settings = {
-        'cliquet.cache_url': '',
-        'cliquet.cache_pool_size': 10
-    }
 
     def __init__(self, *args, **kwargs):
         super(RedisCacheTest, self).__init__(*args, **kwargs)
@@ -145,8 +147,7 @@ class RedisCacheTest(BaseTestCache, unittest.TestCase):
 
 class PostgreSQLCacheTest(BaseTestCache, unittest.TestCase):
     backend = postgresql_backend
-    settings = {
-        'cliquet.cache_pool_size': 10,
+    extra_settings = {
         'cliquet.cache_url':
             'postgres://postgres:postgres@localhost:5432/testdb'
     }
@@ -154,6 +155,6 @@ class PostgreSQLCacheTest(BaseTestCache, unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(PostgreSQLCacheTest, self).__init__(*args, **kwargs)
         self.client_error_patcher = mock.patch.object(
-            self.cache.pool,
-            'getconn',
+            self.cache._engine,
+            'connect',
             side_effect=psycopg2.DatabaseError)
