@@ -195,7 +195,8 @@ conflicts may appear when creating records.
     Deleted records are not taken into account for field unicity.
 
 If a conflict occurs, an error response is returned with status ``409``.
-A ``existing`` attribute in the response gives the offending record.
+A ``details`` attribute in the response provides the offending record and
+field name. See :ref:`dedicated section about errors <error-responses>`_.
 
 
 HTTP Status Codes
