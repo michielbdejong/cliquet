@@ -20,7 +20,7 @@ class BasicAuthAuthenticationPolicy(base_auth.BasicAuthAuthenticationPolicy):
 
     """
     def __init__(self, *args, **kwargs):
-        noop_check = lambda *a: [Authenticated]  # NOQA
+        noop_check = lambda *a: []  # NOQA
         super(BasicAuthAuthenticationPolicy, self).__init__(noop_check,
                                                             *args,
                                                             **kwargs)
@@ -77,8 +77,27 @@ class Oauth2AuthenticationPolicy(base_auth.CallbackAuthenticationPolicy):
         self.cache = oauth_cache
 
     def unauthenticated_userid(self, request):
-        user_id = self._get_credentials(request)
-        return user_id
+        profile = self._get_credentials(request)
+        if profile is None:
+            return None
+
+        # Attach scopes to request.
+        setattr(request, '_fxa_scopes', profile['scope'])
+
+        # Return user-id with prefix.
+        return 'fxa_%s' % profile['user']
+
+    def effective_principals(self, request):
+        """Provide OAuth scopes in principals, in order to allow authorizations
+        policies to rely on them.
+        """
+        principals = super(Oauth2AuthenticationPolicy,
+                           self).effective_principals(request)
+
+        # unauthenticated_userid() is always called before this.
+        scopes = getattr(request, '_fxa_scopes', [])
+
+        return principals + scopes
 
     def forget(self, request):
         """A no-op. Credentials are sent on every request.
@@ -106,13 +125,12 @@ class Oauth2AuthenticationPolicy(base_auth.CallbackAuthenticationPolicy):
         auth_client = OAuthClient(server_url=server_url, cache=self.cache)
         try:
             profile = auth_client.verify_token(token=auth, scope=scope)
-            user_id = profile['user']
         except fxa_errors.OutOfProtocolError:
             raise httpexceptions.HTTPServiceUnavailable()
         except (fxa_errors.InProtocolError, fxa_errors.TrustError):
             return None
 
-        return 'fxa_%s' % user_id
+        return profile
 
 
 @implementer(IAuthorizationPolicy)

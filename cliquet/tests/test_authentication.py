@@ -4,6 +4,7 @@ import time
 
 import mock
 from fxa import errors as fxa_errors
+from pyramid import security
 from pyramid import testing
 
 from cliquet import authentication
@@ -107,6 +108,12 @@ class BasicAuthenticationPolicyTest(unittest.TestCase):
         user_id = self.policy.unauthenticated_userid(self.request)
         self.assertTrue(user_id.startswith('basicauth_'))
 
+    def test_principals_are_limited_to_authenticated_and_user_id(self):
+        user_id = self.policy.unauthenticated_userid(self.request)
+        principals = self.policy.effective_principals(self.request)
+        self.assertEqual(sorted(principals),
+                         [user_id, security.Authenticated, security.Everyone])
+
     @mock.patch('cliquet.authentication.hmac.new')
     def test_userid_is_hashed(self, mocked):
         mocked.return_value = hashlib.sha224('hashed'.encode('utf8'))
@@ -162,3 +169,12 @@ class Oauth2AuthenticationPolicyTest(unittest.TestCase):
         time.sleep(0.02)
         self.policy.unauthenticated_userid(self.request)
         self.assertEqual(2, api_mocked.call_count)
+
+    @mock.patch('fxa.oauth.APIClient.post')
+    def test_principals_contain_oauth_scopes(self, api_mocked):
+        api_mocked.return_value = self.profile_data
+        self.policy.unauthenticated_userid(self.request)
+        principals = self.policy.effective_principals(self.request)
+        self.assertEqual(sorted(principals),
+                         ['fxa_33', 'profile',
+                          security.Authenticated, security.Everyone])

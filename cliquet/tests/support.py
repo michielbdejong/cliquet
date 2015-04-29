@@ -73,7 +73,8 @@ class FakeAuthentMixin(object):
 
         self.fxa_verify = self.patcher.start()
         self.fxa_verify.return_value = {
-            'user': 'bob'
+            'user': 'bob',
+            'scope': ['profile']
         }
 
     def tearDown(self):

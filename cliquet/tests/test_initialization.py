@@ -195,7 +195,7 @@ class StatsDConfigurationTest(unittest.TestCase):
     @mock.patch('cliquet.statsd.Client')
     def test_statsd_counts_unique_users(self, mocked, verify_mocked):
         cliquet.initialize(self.config, '0.0.1')
-        verify_mocked.return_value = {'user': 'mat'}
+        verify_mocked.return_value = {'user': 'mat', 'scope': ['profile']}
         app = webtest.TestApp(self.config.make_wsgi_app())
         app.get('/v0/__heartbeat__', headers={'Authorization': 'Bearer abcde'})
         mocked().count.assert_any_call('users', unique='fxa_mat')
