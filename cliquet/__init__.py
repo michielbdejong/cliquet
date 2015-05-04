@@ -171,19 +171,8 @@ def set_auth(config):
     config.commit()
 
 
-def attach_http_objects(config):
-    """Attach HTTP requests/responses objects.
-
-    This is useful to attach objects to the request object for easier
-    access, and to pre-process responses.
-    """
-
-    def on_new_request(event):
-        # Attach objects on requests for easier access.
-        event.request.db = config.registry.storage
-        event.request.cache = config.registry.cache
-
-    config.add_subscriber(on_new_request, NewRequest)
+def handle_backoff(config):
+    """Add Backoff response header is enabled in settings."""
 
     def on_new_response(event):
         # Add backoff in response headers.
@@ -296,6 +285,7 @@ def includeme(config):
 
     force_requests_url(config)
     handle_api_redirection(config)
+    handle_backoff(config)
     config.add_tween("cliquet.end_of_life_tween_factory")
 
     storage = config.maybe_dotted(settings['cliquet.storage_backend'])
@@ -308,7 +298,6 @@ def includeme(config):
     config.registry.id_generator = id_generator()
 
     set_auth(config)
-    attach_http_objects(config)
 
     # Handle StatsD
     handle_statsd(config)

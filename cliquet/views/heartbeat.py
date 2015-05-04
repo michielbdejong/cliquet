@@ -10,8 +10,8 @@ heartbeat = Service(name="heartbeat", path='/__heartbeat__',
 @heartbeat.get(permission=NO_PERMISSION_REQUIRED)
 def get_heartbeat(request):
     """Return information about server health."""
-    database = request.db.ping(request)
-    cache = request.cache.ping()
+    database = request.registry.storage.ping(request)
+    cache = request.registry.cache.ping()
     oauth = fxa_ping(request)
 
     status = dict(database=database, cache=cache, oauth=oauth)
