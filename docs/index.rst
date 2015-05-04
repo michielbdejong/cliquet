@@ -22,6 +22,7 @@ Table of content
    storage
    cache
    errors
+   ecosystem
    contributing
    glossary
    api/index
